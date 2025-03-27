@@ -14,7 +14,7 @@ def generate_samples(num_samples):
     x2 = 6 *np.random.randn(num_samples) + 2
     noise = np.random.randn(num_samples) 
     x = np.column_stack((x1, x2))
-    y = 5 * x1 + 7 * x2 + 9 + noise 
+    y = 5 * x1 + 7 * x2 + 9 + noise  #这个模型要跟predict函数中的模型一致
     return x,y
 #预测
 def predict(X,W,b):
@@ -25,32 +25,48 @@ def error(X,Y,W,b):
 #损失函数
 def loss(X,Y,W,b):
     return np.mean(error(X,Y,W,b)**2)
-#成本函数
-def cost_function(X,Y,W,b):
-    return  1/2 * loss(X,Y,W,b)
-#梯度
-def gradient(X,Y,W,b):
+#成本函数（添加正则化）
+def cost_function(X,Y,W,b,reg_type='l2',lambda_=0.01):
+    cost = 1/2 * loss(X,Y,W,b)
+    if reg_type == 'l2':
+        # L2正则化 (Ridge)
+        cost += lambda_ * np.sum(W**2) / 2
+    elif reg_type == 'l1':
+        # L1正则化 (Lasso)
+        cost += lambda_ * np.sum(np.abs(W))
+    return cost
+#梯度（添加正则化）
+def gradient(X,Y,W,b,reg_type='l2',lambda_=0.01):
     n = len(Y)
     err = error(X,Y,W,b)
     dW = -2/n * np.matmul(X.T, err)
+    
+    # 添加正则化项的梯度
+    if reg_type == 'l2':
+        # L2正则化的梯度
+        dW += lambda_ * W
+    elif reg_type == 'l1':
+        # L1正则化的梯度
+        dW += lambda_ * np.sign(W)
+        
     db = -2/n * np.sum(err)
     return dW, db
 #更新参数
-def update_parameters(X,Y,W,b,learning_rate):
-    dW,db = gradient(X,Y,W,b)
+def update_parameters(X,Y,W,b,learning_rate,reg_type='l2',lambda_=0.01):
+    dW,db = gradient(X,Y,W,b,reg_type,lambda_)
     W = W - learning_rate * dW
     b = b - learning_rate * db
     return W,b
-#训练
-def train(X,Y,W,b,learning_rate,num_iterations):
+#训练（添加正则化参数）
+def train(X,Y,W,b,learning_rate,num_iterations,reg_type='l2',lambda_=0.01):
     W_history = []
     b_history = []
     cost_history = []
     for i in range(num_iterations):
-        W,b = update_parameters(X,Y,W,b,learning_rate)
+        W,b = update_parameters(X,Y,W,b,learning_rate,reg_type,lambda_)
         W_history.append(W)
         b_history.append(b)
-        cost_history.append(cost_function(X,Y,W,b))
+        cost_history.append(cost_function(X,Y,W,b,reg_type,lambda_))
         print(f"Iteration {i+1}/{num_iterations}, Cost: {cost_history[-1]},W:{W},b:{b}")
     return W,b,cost_history,W_history,b_history
 
@@ -91,7 +107,12 @@ def main():
     b = 0
     learning_rate = 0.01 #学习率
     num_iterations = 500 #迭代次数
-    W,b,cost_history,W_history,b_history = train(X_norm,Y_norm,W,b,learning_rate,num_iterations)
+    
+    # 增加正则化参数
+    reg_type = 'l2'  # 可选 'l1' 或 'l2'
+    lambda_ = 0.01   # 正则化强度
+    
+    W,b,cost_history,W_history,b_history = train(X_norm,Y_norm,W,b,learning_rate,num_iterations,reg_type,lambda_)
     
     # 还原参数到原始尺度
     W_original, b_original = denormalize_parameters(W, b, mean_X, std_X, mean_Y, std_Y)
